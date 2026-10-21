@@ -22,7 +22,7 @@ def test_training_serialization_inference_and_reports(trained, tmp_path):
     np.testing.assert_array_equal([r.score for r in before], [r.score for r in after])
     report = tmp_path / "report.json"
     export_json(report, after, loaded, capture.stats)
-    data = json.loads(report.read_text())
+    data = json.loads(report.read_text(encoding="utf-8"))
     assert data["summary"]["windows"] == len(after)
     assert data["results"][0]["end_ns"] > data["results"][0]["start_ns"]
     assert data["model"]["seed"] == 42

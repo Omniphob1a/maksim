@@ -33,7 +33,7 @@ try {
     $appSource = (Resolve-Path 'artifacts/frozen/NetGAF').Path
     $outputPath = Join-Path $projectRoot 'artifacts/windows'
     New-Item -ItemType Directory -Force -Path $outputPath | Out-Null
-    & $compiler "/DAppVersion=$version" "/DAppSource=$appSource" "/DOutputPath=$outputPath" packaging/windows/installer.iss
+    & $compiler "/DAppVersion=$version" "/DAppSource=$appSource" "/DOutputPath=$outputPath" packaging/windows/installer.iss 2>&1 | Tee-Object -FilePath artifacts/innosetup.log
     if ($LASTEXITCODE -ne 0) { throw 'Installer compilation failed.' }
     Copy-Item src/netgaf/assets/user-guide.html (Join-Path $outputPath 'NetGAF-Instruction.html')
     Copy-Item src/netgaf/assets/user-guide.txt (Join-Path $outputPath 'NetGAF-Instruction.txt')

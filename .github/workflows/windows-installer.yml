@@ -7,6 +7,7 @@ on:
       - '.github/workflows/windows-installer.yml'
       - 'packaging/**'
       - 'src/**'
+      - 'tests/**'
       - 'pyproject.toml'
       - 'uv.lock'
       - 'downloads/NetGAF-source.zip'
@@ -42,7 +43,13 @@ jobs:
             exit $testExit
           }
       - name: Build application and installer
-        run: ./packaging/windows/build.ps1
+        run: |
+          try { ./packaging/windows/build.ps1 }
+          catch {
+            $message = ($_ | Out-String).Replace('%','%25').Replace("`r",'%0D').Replace("`n",'%0A')
+            Write-Output "::error::$message"
+            throw
+          }
       - name: Check standalone executable
         run: |
           $exe = (Resolve-Path 'artifacts/frozen/NetGAF/NetGAF.exe').Path
@@ -82,6 +89,16 @@ jobs:
           gh release upload $tag @assets --repo $env:GITHUB_REPOSITORY --clobber
           if ($LASTEXITCODE -ne 0) { throw 'Installer upload failed.' }
           "Installer: https://github.com/$env:GITHUB_REPOSITORY/releases/tag/$tag" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
+      - name: Report build failure details
+        if: failure()
+        run: |
+          foreach ($log in @('artifacts/pyinstaller.log','artifacts/innosetup.log')) {
+            if (Test-Path $log) {
+              $tail = (Get-Content $log | Select-Object -Last 45) -join "`n"
+              $message = $tail.Replace('%','%25').Replace("`r",'%0D').Replace("`n",'%0A')
+              Write-Output "::error::$message"
+            }
+          }
       - name: Preserve build evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -90,6 +107,7 @@ jobs:
           retention-days: 14
           path: |
             artifacts/pyinstaller.log
+            artifacts/innosetup.log
             artifacts/windows-tests.log
             ${{ runner.temp }}/netgaf-checks/
             ${{ runner.temp }}/netgaf-install.log
