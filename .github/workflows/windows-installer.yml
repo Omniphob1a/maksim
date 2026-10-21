@@ -30,10 +30,17 @@ jobs:
         run: uv sync --locked --extra dev --extra build
       - name: Test application on Windows
         run: |
+          New-Item -ItemType Directory -Force -Path artifacts | Out-Null
           uv run --frozen ruff check .
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          uv run --frozen pytest -q
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          uv run --frozen pytest -q --tb=short 2>&1 | Tee-Object -FilePath artifacts/windows-tests.log
+          $testExit = $LASTEXITCODE
+          if ($testExit -ne 0) {
+            $tail = (Get-Content artifacts/windows-tests.log | Select-Object -Last 70) -join "`n"
+            $escaped = $tail.Replace('%','%25').Replace("`r",'%0D').Replace("`n",'%0A')
+            Write-Output "::error::$escaped"
+            exit $testExit
+          }
       - name: Build application and installer
         run: ./packaging/windows/build.ps1
       - name: Check standalone executable
@@ -83,5 +90,6 @@ jobs:
           retention-days: 14
           path: |
             artifacts/pyinstaller.log
+            artifacts/windows-tests.log
             ${{ runner.temp }}/netgaf-checks/
             ${{ runner.temp }}/netgaf-install.log

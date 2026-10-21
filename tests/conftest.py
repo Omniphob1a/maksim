@@ -23,7 +23,7 @@ def normal_path(tmp_path_factory):
         for second in range(225):
             for index in range(3 + second % 5):
                 packet = (
-                    Ether()
+                    Ether(src="02:00:00:00:00:01", dst="02:00:00:00:00:02")
                     / IP(src="192.0.2.1", dst="198.51.100.2")
                     / TCP(sport=40000, dport=80 + index % 2)
                     / Raw(b"x" * (40 + second % 100))

@@ -1,5 +1,6 @@
 import shutil
 import time
+from pathlib import Path
 
 from PySide6.QtWidgets import QApplication
 
@@ -81,7 +82,8 @@ def test_ready_example_and_installed_guide(monkeypatch, trained, normal_path, tm
         "netgaf.gui.QDesktopServices.openUrl", lambda url: opened.append(url.toLocalFile()) or True
     )
     window.open_guide()
-    assert opened == [str(user_guide())]
+    assert len(opened) == 1
+    assert Path(opened[0]) == user_guide()
     assert user_guide().is_file() and user_guide().with_suffix(".txt").is_file()
     window.close()
     app.processEvents()

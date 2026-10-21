@@ -14,10 +14,16 @@ from netgaf.windows import make_windows, training_split
 def test_real_packet_formats_and_missing_ports(tmp_path, writer_type, suffix):
     path = tmp_path / ("capture" + suffix)
     packets = [
-        Ether() / IP(src="192.0.2.1", dst="198.51.100.2") / TCP(dport=443),
-        Ether() / IP(src="192.0.2.1", dst="198.51.100.2") / ICMP(),
-        Ether() / IPv6(src="2001:db8::1", dst="2001:db8::2") / TCP(dport=80),
-        Ether() / ARP(),
+        Ether(src="02:00:00:00:00:01", dst="02:00:00:00:00:02")
+        / IP(src="192.0.2.1", dst="198.51.100.2")
+        / TCP(dport=443),
+        Ether(src="02:00:00:00:00:01", dst="02:00:00:00:00:02")
+        / IP(src="192.0.2.1", dst="198.51.100.2")
+        / ICMP(),
+        Ether(src="02:00:00:00:00:01", dst="02:00:00:00:00:02")
+        / IPv6(src="2001:db8::1", dst="2001:db8::2")
+        / TCP(dport=80),
+        Ether(src="02:00:00:00:00:01", dst="02:00:00:00:00:02") / ARP(),
     ]
     with writer_type(str(path)) as writer:
         for index, packet in enumerate(packets):
@@ -43,7 +49,11 @@ def test_no_windows_across_capture_gaps(tmp_path):
     with PcapWriter(str(path), sync=True) as writer:
         for base in (0, 1000):
             for second in range(33):
-                packet = Ether() / IP(src="192.0.2.1", dst="198.51.100.2") / TCP(dport=80)
+                packet = (
+                    Ether(src="02:00:00:00:00:01", dst="02:00:00:00:00:02")
+                    / IP(src="192.0.2.1", dst="198.51.100.2")
+                    / TCP(dport=80)
+                )
                 packet.time = 1_700_000_000 + base + second
                 writer.write(packet)
     config = AnalysisConfig(window_size=16)
@@ -66,7 +76,7 @@ def test_packet_order_error_is_explicit(tmp_path):
     path = tmp_path / "unordered.pcap"
     with PcapWriter(str(path), sync=True) as writer:
         for stamp in (1000, 999):
-            packet = Ether() / IP() / TCP()
+            packet = Ether(src="02:00:00:00:00:01", dst="02:00:00:00:00:02") / IP() / TCP()
             packet.time = stamp
             writer.write(packet)
     with pytest.raises(ValueError, match="порядок"):
@@ -91,7 +101,7 @@ def test_outer_node_does_not_use_encapsulated_ports(tmp_path):
     with PcapWriter(str(path), sync=True) as writer:
         for second in range(33):
             packet = (
-                Ether()
+                Ether(src="02:00:00:00:00:01", dst="02:00:00:00:00:02")
                 / IP(src="192.0.2.1", dst="198.51.100.2")
                 / IP(src="10.0.0.1", dst="10.0.0.2")
                 / TCP(dport=443)
