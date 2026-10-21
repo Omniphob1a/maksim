@@ -1,0 +1,87 @@
+name: Windows installer
+on:
+  workflow_dispatch:
+  push:
+    branches: [netgaf-prototype]
+    paths:
+      - '.github/workflows/windows-installer.yml'
+      - 'packaging/**'
+      - 'src/**'
+      - 'pyproject.toml'
+      - 'uv.lock'
+      - 'downloads/NetGAF-source.zip'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-2022
+    timeout-minutes: 45
+    env:
+      QT_QPA_PLATFORM: offscreen
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: '3.12'
+          version: '0.12.23'
+      - name: Install pinned dependencies
+        run: uv sync --locked --extra dev --extra build
+      - name: Test application on Windows
+        run: |
+          uv run --frozen ruff check .
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          uv run --frozen pytest -q
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Build application and installer
+        run: ./packaging/windows/build.ps1
+      - name: Check standalone executable
+        run: |
+          $exe = (Resolve-Path 'artifacts/frozen/NetGAF/NetGAF.exe').Path
+          $result = Join-Path $env:RUNNER_TEMP 'netgaf-checks/portable/result.json'
+          ./packaging/windows/check-executable.ps1 -Executable $exe -Result $result
+      - name: Install, run and uninstall
+        run: |
+          $setup = (Get-ChildItem artifacts/windows/NetGAF-Setup-*-x64.exe | Select-Object -First 1).FullName
+          $installed = Join-Path $env:RUNNER_TEMP 'NetGAF проверка установки'
+          $log = Join-Path $env:RUNNER_TEMP 'netgaf-install.log'
+          $process = Start-Process -FilePath $setup -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/SP-',('/DIR="' + $installed + '"'),('/LOG="' + $log + '"')) -Wait -PassThru
+          if ($process.ExitCode -ne 0) { throw "Installation failed: $($process.ExitCode)" }
+          if (-not (Test-Path (Join-Path $installed 'Инструкция.html'))) { throw 'Installed guide missing.' }
+          if (-not (Test-Path (Join-Path $installed 'Инструкция.txt'))) { throw 'Installed text guide missing.' }
+          $result = Join-Path $env:RUNNER_TEMP 'netgaf-checks/installed/result.json'
+          ./packaging/windows/check-executable.ps1 -Executable (Join-Path $installed 'NetGAF.exe') -Result $result
+          $uninstaller = Join-Path $installed 'unins000.exe'
+          $process = Start-Process -FilePath $uninstaller -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART') -Wait -PassThru
+          if ($process.ExitCode -ne 0) { throw "Uninstall failed: $($process.ExitCode)" }
+          if (Test-Path (Join-Path $installed 'NetGAF.exe')) { throw 'Application remains after uninstall.' }
+          if (-not (Test-Path $result)) { throw 'Uninstall removed user results outside the application.' }
+      - name: Publish installer with instructions
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $version = (& uv run --frozen python -c 'from netgaf import __version__; print(__version__)').Trim()
+          $tag = 'v' + $version + '-windows-' + $env:GITHUB_SHA.Substring(0,7)
+          $releaseFiles = @(Get-ChildItem artifacts/windows -File)
+          $hashes = @($releaseFiles | ForEach-Object { (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLower() + '  ' + $_.Name })
+          [IO.File]::WriteAllLines((Join-Path (Resolve-Path 'artifacts/windows').Path 'SHA256SUMS.txt'), $hashes)
+          gh release view $tag --repo $env:GITHUB_REPOSITORY *> $null
+          if ($LASTEXITCODE -ne 0) {
+            gh release create $tag --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title "NetGAF $version — установщик Windows" --notes-file packaging/windows/release-notes.md --latest
+            if ($LASTEXITCODE -ne 0) { throw 'Release creation failed.' }
+          }
+          $assets = @(Get-ChildItem artifacts/windows -File | ForEach-Object { $_.FullName })
+          gh release upload $tag @assets --repo $env:GITHUB_REPOSITORY --clobber
+          if ($LASTEXITCODE -ne 0) { throw 'Installer upload failed.' }
+          "Installer: https://github.com/$env:GITHUB_REPOSITORY/releases/tag/$tag" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
+      - name: Preserve build evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer-checks
+          retention-days: 14
+          path: |
+            artifacts/pyinstaller.log
+            ${{ runner.temp }}/netgaf-checks/
+            ${{ runner.temp }}/netgaf-install.log

@@ -15,10 +15,11 @@ from PySide6.QtCore import (
     QSortFilterProxyModel,
     Qt,
     QThread,
+    QUrl,
     Signal,
     Slot,
 )
-from PySide6.QtGui import QColor
+from PySide6.QtGui import QColor, QDesktopServices
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
@@ -53,6 +54,7 @@ from .demo import generate_demo
 from .evaluation import evaluate_demo
 from .model import analyze, load_detector, reconstruct, save_detector, train_detector
 from .reports import export_csv, export_json, utc_time
+from .resources import find_demo_directory, user_guide
 
 BG, PANEL, TEXT, MUTED, ACCENT = "#101923", "#182532", "#e7eef6", "#98adbf", "#4dd8c5"
 COLORS = ["#4dd8c5", "#6ca7ff", "#f5b96b"]
@@ -226,6 +228,8 @@ class MainWindow(QMainWindow):
         root.setContentsMargins(22, 16, 22, 14)
         root.setSpacing(14)
         self.setCentralWidget(central)
+        help_action = self.menuBar().addMenu("Справка").addAction("Инструкция", self.open_guide)
+        help_action.setShortcut("F1")
         header = QHBoxLayout()
         title = QLabel("Net<span style='color:#4dd8c5'>GAF</span>")
         title.setStyleSheet("font-size: 30px; font-weight: 700;")
@@ -314,6 +318,8 @@ class MainWindow(QMainWindow):
         model_layout.addWidget(self.button("Открыть модель .ngaf", self.open_model))
         self.save_model_button = self.button("Сохранить модель", self.save_model)
         model_layout.addWidget(self.save_model_button)
+        self.example_button = self.button("Открыть готовый пример", self.open_example, True)
+        model_layout.addWidget(self.example_button)
         model_layout.addWidget(self.button("Создать демоданные", self.create_demo))
         self.evaluate_button = self.button("Проверить демосценарии", self.evaluate_scenarios)
         model_layout.addWidget(self.evaluate_button)
@@ -534,6 +540,26 @@ class MainWindow(QMainWindow):
                 "Создание демоданных…",
             )
 
+    def open_guide(self):
+        path = user_guide()
+        if not path.is_file() or not QDesktopServices.openUrl(QUrl.fromLocalFile(str(path))):
+            self.error(f"Не удалось открыть инструкцию: {path}")
+
+    def open_example(self):
+        directory = find_demo_directory()
+        if directory is None:
+            self.error("Готовый пример не найден. Создайте демоданные и обучите модель.")
+            return
+
+        def operation(progress, cancel):
+            started = time.perf_counter()
+            detector = load_detector(directory / "model.ngaf")
+            capture = read_capture(directory / "mixed.pcap", detector.config, progress, cancel)
+            results = analyze(capture, detector, progress, cancel)
+            return "example", (detector, capture, results, time.perf_counter() - started, directory)
+
+        self.run_job(operation, "Загрузка готового примера…")
+
     def evaluate_scenarios(self):
         path = QFileDialog.getExistingDirectory(self, "Папка созданного демонстрационного набора")
         if path and self.detector is not None:
@@ -577,6 +603,7 @@ class MainWindow(QMainWindow):
         for button in self._buttons:
             button.setEnabled(not busy)
         self.save_model_button.setEnabled(not busy and self.detector is not None)
+        self.example_button.setEnabled(not busy and find_demo_directory() is not None)
         self.analyze_button.setEnabled(not busy and self.detector is not None)
         self.evaluate_button.setEnabled(not busy and self.detector is not None)
         self.export_button.setEnabled(not busy and bool(self.results))
@@ -608,7 +635,15 @@ class MainWindow(QMainWindow):
     @Slot(object)
     def receive(self, payload):
         kind, value = payload
-        if kind == "model":
+        if kind == "example":
+            detector, capture, results, duration, directory = value
+            self.receive(("model", detector))
+            self.files.clear()
+            self.files.addItem(str(directory / "normal.pcap"))
+            self.normal_confirm.setChecked(True)
+            self.analysis_path = capture.source
+            self.receive(("results", (capture, results, duration)))
+        elif kind == "model":
             self.detector = value
             self.results = []
             self.capture = None

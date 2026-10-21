@@ -4,6 +4,7 @@ from dataclasses import asdict
 from datetime import datetime, timezone
 from pathlib import Path
 
+from . import __version__
 from .capture import CaptureStats
 from .model import Detector, Result
 
@@ -16,7 +17,7 @@ def utc_time(nanoseconds: int):
 
 def export_json(path: str | Path, results: list[Result], detector: Detector, stats: CaptureStats):
     payload = {
-        "application": "NetGAF 0.1.0",
+        "application": f"NetGAF {__version__}",
         "exported_at": datetime.now(timezone.utc).isoformat(),
         "time_basis": "UTC; intervals [start, end)",
         "config": detector.config.to_dict(),

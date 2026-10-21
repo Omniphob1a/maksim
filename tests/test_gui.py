@@ -1,9 +1,11 @@
+import shutil
 import time
 
 from PySide6.QtWidgets import QApplication
 
 from netgaf.gui import STYLE, MainWindow
 from netgaf.model import save_detector
+from netgaf.resources import user_guide
 
 
 def wait_job(app, window):
@@ -53,5 +55,33 @@ def test_desktop_training_analysis_selection_and_export(monkeypatch, normal_path
     window.only_anomalies.setChecked(True)
     app.processEvents()
     assert window.proxy.rowCount() == sum(r.anomalous for r in window.results)
+    window.close()
+    app.processEvents()
+
+
+def test_ready_example_and_installed_guide(monkeypatch, trained, normal_path, tmp_path):
+    detector, _ = trained
+    save_detector(detector, tmp_path / "model.ngaf")
+    shutil.copyfile(normal_path, tmp_path / "normal.pcap")
+    shutil.copyfile(normal_path, tmp_path / "mixed.pcap")
+    monkeypatch.setattr("netgaf.gui.find_demo_directory", lambda: tmp_path)
+    app = QApplication.instance() or QApplication([])
+    window = MainWindow()
+    errors = []
+    monkeypatch.setattr(window, "error", errors.append)
+    window.show()
+    window.example_button.click()
+    wait_job(app, window)
+    assert not errors
+    assert window.results and window.detector is not None
+    assert window.normal_confirm.isChecked()
+    assert window.files.count() == 1
+    opened = []
+    monkeypatch.setattr(
+        "netgaf.gui.QDesktopServices.openUrl", lambda url: opened.append(url.toLocalFile()) or True
+    )
+    window.open_guide()
+    assert opened == [str(user_guide())]
+    assert user_guide().is_file() and user_guide().with_suffix(".txt").is_file()
     window.close()
     app.processEvents()

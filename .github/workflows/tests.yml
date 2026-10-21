@@ -8,8 +8,6 @@ jobs:
     runs-on: ${{ matrix.os }}
     env:
       QT_QPA_PLATFORM: offscreen
-      MPLCONFIGDIR: ${{ runner.temp }}/netgaf-mpl
-      XDG_CACHE_HOME: ${{ runner.temp }}/netgaf-cache
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
