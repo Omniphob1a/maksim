@@ -1,0 +1,43 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "netgaf"
+version = "0.1.0"
+description = "Desktop network anomaly research with Gramian Angular Field images"
+readme = "README.md"
+requires-python = ">=3.11,<3.14"
+dependencies = [
+  "numpy>=2.2,<3",
+  "scapy>=2.6.1,<3",
+  "torch>=2.7.1,<3",
+  "PySide6-Essentials>=6.8,<7",
+  "matplotlib>=3.10,<4",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.4,<10", "ruff>=0.12,<1"]
+
+[project.scripts]
+netgaf = "netgaf.cli:main"
+
+[project.gui-scripts]
+netgaf-desktop = "netgaf.gui:main"
+
+[tool.uv.sources]
+torch = [{ index = "pytorch-cpu" }]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I"]
