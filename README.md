@@ -15,8 +15,8 @@ Desktop-прототип для ВКР «Программное средство
 
 ## Установка и запуск
 
-Для Windows: откройте [выпуски NetGAF](https://github.com/Omniphob1a/maksim/releases),
-скачайте `NetGAF-Setup-0.2.0-x64.exe` из проверенного Windows-выпуска и запустите.
+Для Windows: [скачайте установщик NetGAF 0.2.0](https://github.com/Omniphob1a/maksim/releases/download/v0.2.0-windows-3a33710/NetGAF-Setup-0.2.0-x64.exe)
+и запустите его. Другие версии доступны на [странице выпусков](https://github.com/Omniphob1a/maksim/releases).
 Установщик включает Python, Qt, PyTorch CPU, готовую модель и примеры.
 После установки нажмите **«Открыть готовый пример»**. Инструкция доступна через
 меню «Пуск» и **F1** в программе. Публикация установщика выполняется только
@@ -25,8 +25,8 @@ Desktop-прототип для ВКР «Программное средство
 Для запуска из исходников (Windows/Linux):
 
 Нужны Python 3.11–3.13 и [uv](https://docs.astral.sh/uv/getting-started/installation/).
-Windows 10/11 и Linux являются целевыми платформами; проверка Windows должна
-выполняться на Windows. Отдельный сетевой драйвер для чтения файлов не нужен.
+Windows 10/11 и Linux являются целевыми платформами; автоматические проверки
+пройдены на Windows Server 2022 и Linux. Отдельный сетевой драйвер для чтения файлов не нужен.
 
 ```bash
 cd maksim
